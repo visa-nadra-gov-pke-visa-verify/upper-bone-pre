@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ارائه تخصصی آناتومی اندام فوقانی</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Tahoma, sans-serif;
+        background: #000;
+        color: white;
+        overflow: hidden;
+        display: flex;
+        height: 100vh;
+      }
+      .container {
+        width: 98%;
+        height: 96vh;
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 15px;
+        padding: 10px;
+        margin: auto;
+      }
+      #modelContainer {
+        background: #050505;
+        border-radius: 12px;
+        border: 1px solid #333;
+        position: relative;
+      }
+      .info-panel {
+        background: #111;
+        border-radius: 12px;
+        padding: 25px;
+        overflow-y: auto;
+        border: 1px solid #333;
+      }
+      .bone-title {
+        color: #3498db;
+        font-size: 1.8rem;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      .bone-desc {
+        line-height: 2.1;
+        text-align: justify;
+        font-size: 1.1rem;
+        color: #ddd;
+      }
+      .section-h {
+        font-weight: bold;
+        color: #3498db;
+        display: block;
+        margin-top: 18px;
+        border-right: 3px solid #3498db;
+        padding-right: 10px;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      button {
+        flex: 1;
+        padding: 15px;
+        border: none;
+        border-radius: 8px;
+        background: #3498db;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        font-family: Tahoma;
+      }
+      .keyboard-hint {
+        font-size: 0.8rem;
+        color: #666;
+        text-align: center;
+        margin-top: 20px;
+        border-top: 1px solid #333;
+        padding-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div id="modelContainer"></div>
+      <div class="info-panel">
+        <div class="controls">
+          <button onclick="changeSlide(1)">استخوان بعدی ➔</button>
+          <button onclick="changeSlide(-1)" style="background: #444">
+            قبلی
+          </button>
+        </div>
+        <div id="displayArea">
+          <h2 id="boneTitle" class="bone-title">۱. ترقوه (Clavicle)</h2>
+          <div id="boneDesc" class="bone-desc"></div>
+        </div>
+        <div class="keyboard-hint">
+          راهنما: ↑↓←→ برای جابه‌جایی هر دو مدل | اسکرول برای زوم
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+      let scene, camera, renderer, group, controls;
+      let raycaster = new THREE.Raycaster();
+      let mouse = new THREE.Vector2();
+      let originalMaterials = new Map();
+
+      const bonesData = [
+        {
+          t: "۱. ترقوه (Clavicle)",
+          d: "استخوانی بلند و S‌مانند است که به صورت افقی در بالای قفسه سینه قرار دارد.<br><span class='section-h'>اتصال:</span> از یک طرف به جناغ سینه و از طرف دیگر به زائده آکرومیون کتف متصل می‌شود.<br><span class='section-h'>وظیفه:</span> تکیه‌گاهی برای دور نگه داشتن بازوها از تنه و تنها پل استخوانی بین اندام فوقانی و اسکلت محوری.",
+        },
+        {
+          t: "۲. کتف (Scapula)",
+          d: "استخوانی پهن و مثلثی در پشت قفسه سینه.<br><span class='section-h'>اتصال:</span> با استخوان بازو (مفصل شانه) و ترقوه در ارتباط است.<br><span class='section-h'>وظیفه:</span> سطح وسیع برای اتصال عضلات شانه و بازو.",
+        },
+        {
+          t: "۳. بازو (Humerus)",
+          d: "بزرگ‌ترین و بلندترین استخوان اندام فوقانی.<br><span class='section-h'>اتصال:</span> سر گرد در حفره کتف و انتهای پایینی در مفصل آرنج.<br><span class='section-h'>وظیفه:</span> اهرم اصلی برای حرکات بلند کردن و پرتاب کردن.",
+        },
+        {
+          t: "۴. زند زبرین (Radius)",
+          d: "استخوان ساعد در سمت انگشت شست.<br><span class='section-h'>وظیفه:</span> نقش اصلی در چرخش مچ دست (سوپیناسیون و پروناسیون).",
+        },
+        {
+          t: "۵. زند زیرین (Ulna)",
+          d: "استخوان ساعد در سمت انگشت کوچک.<br><span class='section-h'>ویژگی:</span> دارای زائده اولکرانون برای ثبات مفصل آرنج.",
+        },
+        {
+          t: "۶. مچ دست (Carpals)",
+          d: "شامل ۸ استخوان کوچک در دو ردیف.<br><span class='section-h'>وظیفه:</span> ایجاد انعطاف‌پذیری فوق‌العاده برای حرکت مچ در تمام جهت‌ها.",
+        },
+        {
+          t: "۷. کف دست (Metacarpals)",
+          d: "۵ استخوان که بدنه اصلی کف دست را تشکیل می‌دهند و از مچ تا انگشتان امتداد دارند.",
+        },
+        {
+          t: "۸. بند انگشتان (Phalanges)",
+          d: "۱۴ استخوان انگشتان (۳ بند برای هر انگشت و ۲ بند برای شست).<br><span class='section-h'>وظیفه:</span> انجام حرکات ظریف مانند نوشتن و گرفتن اشیاء.",
+        },
+      ];
+
+      function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          2000,
+        );
+        camera.position.set(0, 0, 150);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(
+          document.getElementById("modelContainer").clientWidth,
+          document.getElementById("modelContainer").clientHeight,
+        );
+        document
+          .getElementById("modelContainer")
+          .appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        group = new THREE.Group();
+        scene.add(group);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
+
+        const loader = new THREE.GLTFLoader();
+
+        // لود مدل اول (اسکلت کامل)
+        loader.load("models/skeleton.glb", (gltf) => {
+          const m1 = gltf.scene;
+          m1.position.set(-40, -30, 0);
+          m1.scale.set(10, 10, 10);
+          processModel(m1);
+          group.add(m1);
+        });
+
+        // لود مدل دوم (scene.gltf) - اصلاح شده
+        loader.load("models/scene.gltf", (gltf) => {
+          const m2 = gltf.scene;
+          m2.position.set(300, -80, 0); // ایجاد فاصله ۸۰ واحدی از مدل اول
+
+          // چرخش اصلاحی: چرخش حول محور X برای ایستادن و Y برای روبرو شدن
+          m2.rotation.set(-Math.PI / 2, Math.PI / -1, 0);
+          // اگر بعد از کپی کردن هنوز برعکس بود، خط بالا را به (0, Math.PI, 0) تغییر دهید.
+
+          m2.scale.set(300, 300, 300);
+          processModel(m2);
+          group.add(m2);
+        });
+
+        window.addEventListener("mousemove", onHover);
+        window.addEventListener("keydown", (e) => {
+          const step = 5;
+          if (e.key === "ArrowUp") group.position.y += step;
+          if (e.key === "ArrowDown") group.position.y -= step;
+          if (e.key === "ArrowLeft") group.position.x -= step;
+          if (e.key === "ArrowRight") group.position.x += step;
+        });
+
+        updateText();
+        animate();
+      }
+
+      function processModel(obj) {
+        obj.traverse((n) => {
+          if (n.isMesh) {
+            n.material = n.material.clone();
+            originalMaterials.set(n.uuid, n.material.color.clone());
+          }
+        });
+      }
+
+      function onHover(event) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        group.traverse((n) => {
+          if (n.isMesh && originalMaterials.has(n.uuid)) {
+            n.material.color.copy(originalMaterials.get(n.uuid));
+          }
+        });
+
+        const intersects = raycaster.intersectObjects(group.children, true);
+        if (intersects.length > 0) {
+          intersects[0].object.material.color.setHex(0xff0000);
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      let current = 0;
+      function updateText() {
+        document.getElementById("boneTitle").innerHTML = bonesData[current].t;
+        document.getElementById("boneDesc").innerHTML = bonesData[current].d;
+      }
+
+      window.changeSlide = (dir) => {
+        current = (current + dir + bonesData.length) % bonesData.length;
+        updateText();
+      };
+
+      window.onload = init;
+    </script>
+  </body>
+</html>
